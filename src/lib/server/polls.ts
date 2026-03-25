@@ -132,4 +132,3 @@ export type PollData = {
 	totalVotes: number;
 	myVoteOptionId: string | null;
 };
-

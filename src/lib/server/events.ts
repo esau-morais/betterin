@@ -106,4 +106,3 @@ export type EventData = {
 	location: string | null;
 	externalUrl: string | null;
 };
-

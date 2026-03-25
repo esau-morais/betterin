@@ -285,4 +285,3 @@ export type ArticleData = {
 	coverImageUrl: string | null;
 	readingTimeMinutes: number;
 };
-
