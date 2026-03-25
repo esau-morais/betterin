@@ -9,6 +9,7 @@
 		"ignoreUnknown": false,
 		"includes": [
 			"**/src/**/*",
+			"**/emails/**/*",
 			"**/.vscode/**/*",
 			"**/index.html",
 			"**/vite.config.ts",
@@ -33,4 +34,3 @@
 		}
 	}
 }
-

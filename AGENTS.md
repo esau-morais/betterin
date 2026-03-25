@@ -1,6 +1,6 @@
 # Better-In — Agent Memory
 
-Better-In is a faster, privacy-first LinkedIn alternative. Anti-cringe, anti-dark-pattern, chronological feed, salary-required job posts.
+Better-In is a faster, privacy-first social network with career features. Anti-cringe, anti-dark-pattern, chronological feed, salary-required job posts.
 
 ## Intent Skills
 
@@ -9,6 +9,8 @@ Better-In is a faster, privacy-first LinkedIn alternative. Anti-cringe, anti-dar
 skills:
   - task: "UI components, design tokens, colors, typography, layout, spacing, cards, avatars, buttons, icons, motion, accessibility, theme"
     load: ".agents/skills/better-in-ui-taste/SKILL.md"
+  - task: "mutations, server functions, data fetching, queries, optimistic updates, TanStack Query, TanStack Start, notifications, settings, preferences, useMutation, useQuery, createServerFn"
+    load: ".agents/skills/better-in-tanstack-patterns/SKILL.md"
 <!-- intent-skills:end -->
 
 ---
@@ -52,7 +54,7 @@ bunx @tanstack/cli@latest libraries --json
 | Cache / pubsub | Redis (Docker) |
 | Styling | Tailwind CSS v4 + shadcn/ui |
 | Font | Geist Sans (primary), Geist Mono (metrics/code) |
-| Icons | Lucide React |
+| Icons | Phosphor Icons (`@phosphor-icons/react`, always use `Icon` suffix e.g. `HouseIcon`), [SVGL](https://svgl.app/) (brand logos via `https://api.svgl.app?search=<name>`) |
 | Package manager | **bun** — always use `bun add`, `bun run`, never npm/pnpm/yarn |
 | Linter/formatter | Biome |
 | Push (iOS) | `apns2` npm package behind `PushProvider` interface |
@@ -69,7 +71,7 @@ better-in/
 │   │   ├── __root.tsx          # Root layout (nav, theme, fonts)
 │   │   ├── _authed.tsx         # Auth-required layout wrapper
 │   │   ├── _authed/
-│   │   │   ├── feed.tsx        # Chronological feed
+│   │   │   ├── feed.tsx        # Relevance-ranked feed (toggleable chronological)
 │   │   │   ├── profile.$handle.tsx
 │   │   │   ├── jobs.tsx
 │   │   │   ├── messages.tsx
@@ -119,7 +121,8 @@ better-in/
 │           └── SKILL.md
 ├── docker-compose.yml
 ├── .env.example
-├── AGENTS.md                   # this file
+├── MEMORY.md                   # Agent memory (context & conventions)
+├── PLAN.md                     # Implementation timeline & architecture
 └── package.json
 ```
 
@@ -244,7 +247,8 @@ Client                  Nitro Server             Redis
 - **connections** — (id, requesterId FK, addresseeId FK, status enum[pending,accepted,blocked], createdAt)
 - **follows** — (id, followerId FK, followedId FK, createdAt) — for one-way follow without connecting
 
-- **posts** — (id, authorId FK, content, mediaUrls[], visibility enum[public,connections,private], createdAt, updatedAt, deletedAt)
+- **posts** — (id, authorId FK, content, mediaUrls[], visibility enum[public,connections,private], qualityScore FLOAT DEFAULT 1.0, createdAt, updatedAt, deletedAt)
+  - `qualityScore` updated async by anti-slop pipeline; feeds into feed ranking formula
 - **reactions** — (id, postId FK, userId FK, type enum[like,insightful,celebrate,support], createdAt)
 - **comments** — (id, postId FK, authorId FK, parentId FK nullable, content, createdAt, updatedAt, deletedAt)
 
@@ -261,6 +265,18 @@ Client                  Nitro Server             Redis
 
 - **notifications** — (id, userId FK, type enum[connection_request,connection_accepted,post_reaction,post_comment,job_match,message], actorId FK, entityId, entityType, read BOOL, createdAt)
   - Batched: max 1 notification per type per entity per 24h per user
+
+- **feed_events** — (id, userId FK, postId FK, action enum[impression,click,like,comment,share,save,hide,mute_author,not_interested], dwellMsBucket enum[<2s,2-5s,5-15s,15-30s,30s+], sessionId, feedPosition INT, feedMode enum[ranked,chronological], createdAt)
+  - The ML training data factory — log every feed interaction from day 1
+  - `feedPosition` enables position bias correction in model training
+  - `dwellMsBucket` bucketed (not raw) to prevent optimizing for raw dwell time
+- **feed_impressions** — (id, userId FK, sessionId, postIds JSONB, rankingScores JSONB, rankingStage enum[rule_v1,ml_v1,neural_v1], createdAt)
+  - What was shown and in what order — required for counterfactual evaluation and A/B testing of ranking models
+
+- **user_preferences** — (id, userId FK, feedMode enum[ranked,chronological] DEFAULT ranked, aiConsentFeedPersonalization BOOL DEFAULT false, aiConsentContentModeration BOOL DEFAULT false, aiConsentJobMatching BOOL DEFAULT false, showImpressionCount BOOL DEFAULT true, shareLocationInAnalytics BOOL DEFAULT true, createdAt, updatedAt)
+  - `feedMode` toggle between ranked and chronological
+  - `aiConsent*` granular per-use-case consent for ML training on user content (default: opted out)
+  - `shareLocationInAnalytics` opt-out: user's city appears in post authors' analytics (default: opted in)
 
 - **push_tokens** — (id, userId FK, platform enum[ios,android], token, createdAt)
 - **moderation_queue** — (id, entityId, entityType, reportedBy FK, reason, status enum[pending,reviewed,actioned,dismissed], createdAt)
@@ -383,9 +399,8 @@ export default defineEventHandler(async (event) => {
 
 ### Biome (Lint/Format)
 ```sh
-bun run check    # lint + format check
-bun run format   # auto-format
 bun run lint     # lint only
+bun run format   # auto-format
 ```
 
 ### Environment Variables
@@ -402,53 +417,20 @@ APNS_KEY_PATH=...
 
 ---
 
-## Anti-LinkedIn Principles (enforce in code)
+## Code Style
 
-1. **Chronological feed** — no engagement ranking. `ORDER BY created_at DESC` only.
-2. **No engagement metrics visible** — hide like counts on posts, show reactions as icons only.
-3. **Salary required** — `salaryMin`/`salaryMax` are `NOT NULL` in jobs table. Reject job posts without salary via API validation.
-4. **30-day job auto-expire** — `expiresAt = NOW() + INTERVAL '30 days'` on insert. Cron marks expired.
-5. **Opt-in messaging** — `createConversation` checks both parties are connected first.
-6. **Minimal notifications** — batch: max 1 notification per type/entity/user/24h. No "X viewed your profile" spam.
-7. **No extension fingerprinting** — never enumerate browser extensions.
-8. **No clipboard snooping** — never read clipboard without explicit user action.
+- DO NOT write unnecessary comments. Only write comments to explain business rules, edge cases, or non-obvious constraints — not to describe what the code obviously does. Never use long-line banner/divider comments (`// ---...---`, `// ───...───`, `/* ───...─── */`) to separate sections of a file.
+- TDD: write tests before or alongside implementation. Tests must cover real behavior and edge cases — not just happy paths. Goal is correctness, not coverage %.
 
----
+### TypeScript Best Practices
 
-## Content Moderation (3-tier)
-
-1. **In-process keyword filter** — runs synchronously before DB write. Maintains professional allowlist: `["terminated","hostile work environment","sexual harassment","kill the project","fired","laid off"]` (these are legitimate professional terms).
-2. **OpenAI Moderation API** — async, non-blocking, free. Fires after successful DB write. Flags content for human review if score > 0.7.
-3. **Human review queue** — `moderation_queue` table. Admins review via internal tool. Users can report via "Report" button.
-
----
-
-## iOS App (Phase 2, Week 5+)
-
-- SwiftUI, iOS 17+, `@Observable`, SwiftData
-- URLSession only (no Alamofire)
-- NavigationStack + NavigationSplitView (iPad supported v1)
-- SPM deps: NukeUI (image loading), KeychainAccess (token storage)
-- Auth: Bearer token stored in Keychain
-- Push: APNs via `apns2` on server, `UNUserNotificationCenter` on iOS
-- Background limitation: iOS suspends connections ~30s after background → use APNs for delivery, REST catch-up on foreground
-
----
-
-## Development Commands
-
-```sh
-bun run dev          # start dev server (port 3000)
-bun run build        # production build
-bun run test         # vitest
-bun run check        # biome lint + format check
-
-docker compose up -d # start postgres + redis
-docker compose down  # stop
-docker compose logs  # view logs
-```
-
----
+- **Never use `any`** — use `unknown` + type guards, generics, or proper interface definitions. If interfacing with untyped external APIs, define the expected shape as an interface and validate at the boundary.
+- **Avoid `as` type assertions** — use type narrowing (`if`, `in`, discriminated unions) instead. Only acceptable for tuple literals (`[a, b] as const`) and `satisfies`-style patterns. If you find yourself needing `as`, the type design is likely wrong.
+- **Prefer `satisfies`** over `as` when constraining object shapes while preserving literal types.
+- **Use `unknown` for catch blocks** — `catch (error: unknown)` + `instanceof` check, never `catch (error: any)`.
+- **Zod for external data** — all data from external APIs, user input, and server responses must be validated with zod at the boundary. Derive TypeScript types from zod schemas with `z.infer<>`.
+- **Single source of truth for types** — shared types live in `src/lib/validation.ts` (zod schemas) or co-located with the domain logic. Never duplicate union types inline.
+- **Strict null checks** — handle `null`/`undefined` explicitly. Use optional chaining and nullish coalescing, not non-null assertions (`!`).
 
 ## Gotchas
 
@@ -463,31 +445,25 @@ docker compose logs  # view logs
 - `apns2` requires HTTP/2 — ensure Node.js version supports it (v22+ is fine).
 - Do NOT use `npx` for day-to-day project scripts — use `bun run`.
 - Job posts missing salary should return HTTP 422, not 400 (validation error, not bad request).
+- shadcn composable components (e.g. `DialogContent`, `AvatarImage`): use inline `export function` instead of a separate `export { X }` line at the bottom.
+- Tailwind v4 CSS vars: all `--color-*` tokens are registered in `@theme inline` in `styles.css`. Use bare utility classes (`text-brand`, `bg-bg`, `border-border`) — never `-[var(--color-*)]`.
+- Always use `size-X` instead of `h-X w-X` for square dimensions.
+- In server functions, use `getRequest()` from `@tanstack/react-start/server` to access the incoming request (not `getWebRequest` — that doesn't exist).
+- `tanstackStartCookies` imports from `"better-auth/tanstack-start"`, not `"better-auth/plugins"`.
+- `bearer` (server plugin) imports from `"better-auth/plugins"`. There is no `bearerClient` — web uses cookies automatically.
+- **Brand icons**: Always use SVGL (`https://api.svgl.app?search=<name>`) for brand/company logos. Never hand-draw brand SVGs. SVGL returns JSON with `route` (SVG URL) — some have light/dark variants as `{ light, dark }` objects. GitHub has separate light/dark SVGs; Google has a multi-color SVG.
+- **Social provider type**: The canonical type for OAuth providers is `SocialProvider` defined in `src/routes/sign-in.tsx`. Never duplicate the union inline — import or co-locate from the single definition. Adding a new provider = update the type in one place only.
 
 ---
 
-## Implementation Timeline
+## Development Commands
 
-### Web App (8 weeks)
+```sh
+bun run typecheck        # typescript check
+bun run test         # vitest
+bun run lint        # biome lint
 
-| Week | Focus |
-|---|---|
-| 1 | Foundation: Docker, DB schema, Better Auth, Tailwind/shadcn, root layout |
-| 2 | Auth flows (sign-in, sign-up, email verification), profile creation |
-| 3 | Feed (chronological, composer, post cards, reactions, comments) |
-| 4 | Jobs (listing, search, filters, salary display, apply flow) |
-| 5 | Messaging (conversations, real-time SSE, connection-gated) |
-| 6 | Notifications (batched, SSE delivery, minimal set) |
-| 7 | Search (profiles, jobs, posts), connections, recommendations |
-| 8 | Polish: a11y audit, perf, content moderation wiring, Docker prod build |
-
-### iOS App (16 weeks, starts week 5)
-
-| Week | Focus |
-|---|---|
-| 5–6 | Xcode setup, auth (sign-in/up, Keychain), API client |
-| 7–8 | Profile view/edit, connection list |
-| 9–10 | Feed (list, composer, reactions, comments) |
-| 11–12 | Jobs (listing, filters, apply) |
-| 13–14 | Messaging (conversations, APNs push) |
-| 15–16 | Notifications, search, polish, TestFlight |
+docker compose up -d # start postgres + redis
+docker compose down  # stop
+docker compose logs  # view logs
+```

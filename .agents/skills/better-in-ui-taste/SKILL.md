@@ -6,7 +6,7 @@ version: 1.0.0
 
 # Better-In UI Taste
 
-Better-In is a professional network that respects users. The UI is clean, fast, and purposeful. No dark patterns, no engagement bait, no visual noise.
+Better-In is a social network that respects users. The UI is clean, fast, and purposeful. No dark patterns, no engagement bait, no visual noise.
 
 **Personality:** Calm confidence. Bloomberg-dense information but Vercel-clean chrome.
 
