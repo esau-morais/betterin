@@ -31,17 +31,19 @@ import {
 } from "#/components/ui/dialog";
 import { Skeleton } from "#/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "#/components/ui/tabs";
-import { unverifiedClaimsQueryOptions } from "#/lib/queries";
+import {
+	companyMembersQueryOptions,
+	companyPostsQueryOptions,
+	companyQueryOptions,
+	jobsQueryOptions,
+	unverifiedClaimsQueryOptions,
+} from "#/lib/queries";
 import {
 	disputeExperienceFn,
 	followCompanyFn,
-	getCompanyFn,
-	getCompanyMembersFn,
-	getCompanyPostsFn,
 	unfollowCompanyFn,
 	verifyDomainEmailFn,
 } from "#/lib/server/companies";
-import { listJobsFn } from "#/lib/server/jobs";
 
 const companySearchSchema = z.object({
 	tab: z
@@ -52,12 +54,14 @@ const companySearchSchema = z.object({
 
 export const Route = createFileRoute("/company/$slug")({
 	validateSearch: companySearchSchema,
-	loader: async ({ params }) => {
-		const company = await getCompanyFn({ data: { slug: params.slug } });
+	loader: async ({ params, context: { queryClient } }) => {
+		const company = await queryClient.ensureQueryData(
+			companyQueryOptions(params.slug),
+		);
 		const [members, jobsData, companyPosts] = await Promise.all([
-			getCompanyMembersFn({ data: { companyId: company.id } }),
-			listJobsFn({ data: { sort: "newest", companyId: company.id } }),
-			getCompanyPostsFn({ data: { companyId: company.id } }),
+			queryClient.ensureQueryData(companyMembersQueryOptions(company.id)),
+			queryClient.ensureQueryData(jobsQueryOptions({ companyId: company.id })),
+			queryClient.ensureQueryData(companyPostsQueryOptions(company.id)),
 		]);
 		return { company, members, jobs: jobsData.results, companyPosts };
 	},

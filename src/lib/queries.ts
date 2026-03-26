@@ -1,4 +1,5 @@
 import { infiniteQueryOptions, queryOptions } from "@tanstack/react-query";
+import { hasPasswordFn, listAccountProvidersFn } from "#/lib/server/account";
 import {
 	getCompanyFn,
 	getCompanyMembersFn,
@@ -27,8 +28,22 @@ import {
 	getNotificationsFn,
 	getUnreadNotificationCountFn,
 } from "#/lib/server/notifications";
+import {
+	getPostAnalyticsFn,
+	getPostDailyImpressionsFn,
+	getPostDwellDistributionFn,
+	getPostEngagementTrendFn,
+	getPostFeedContextFn,
+	getPostViewerLocationsFn,
+} from "#/lib/server/post-analytics";
 import { getUserPreferencesFn } from "#/lib/server/preferences";
-import { searchConnectionsFn } from "#/lib/server/profile";
+import {
+	type ConnectionStatus,
+	getProfilePostsFn,
+	getProfileSectionsFn,
+	getPublicProfileSectionsFn,
+	searchConnectionsFn,
+} from "#/lib/server/profile";
 import { type AllSearchResult, searchAllFn } from "#/lib/server/search";
 import {
 	getLatestJobsFn,
@@ -260,5 +275,93 @@ export function companyAutocompleteQueryOptions(q: string) {
 		queryFn: () => listCompaniesFn({ data: { q } }),
 		staleTime: 30_000,
 		enabled: true,
+	});
+}
+
+export function profileSectionsQueryOptions(userId: string) {
+	return queryOptions({
+		queryKey: ["profile-sections", userId] as const,
+		queryFn: () => getProfileSectionsFn({ data: { userId } }),
+	});
+}
+
+export function publicProfileSectionsQueryOptions(userId: string) {
+	return queryOptions({
+		queryKey: ["profile-sections", "public", userId] as const,
+		queryFn: () => getPublicProfileSectionsFn({ data: { userId } }),
+	});
+}
+
+export function profilePostsQueryOptions(
+	userId: string,
+	viewerRelation: ConnectionStatus,
+) {
+	return queryOptions({
+		queryKey: ["profile-posts", userId] as const,
+		queryFn: () =>
+			getProfilePostsFn({
+				data: { userId, viewerRelation, limit: 10 },
+			}),
+	});
+}
+
+export function accountPasswordQueryOptions() {
+	return queryOptions({
+		queryKey: ["account-password-status"] as const,
+		queryFn: () => hasPasswordFn(),
+		staleTime: 60_000,
+	});
+}
+
+export function accountProvidersQueryOptions() {
+	return queryOptions({
+		queryKey: ["account-providers"] as const,
+		queryFn: () => listAccountProvidersFn(),
+		staleTime: 60_000,
+	});
+}
+
+export function postAnalyticsQueryOptions(postId: string, days: number) {
+	return queryOptions({
+		queryKey: ["post-analytics", postId, days] as const,
+		queryFn: () => getPostAnalyticsFn({ data: { postId, days } }),
+	});
+}
+
+export function postDailyImpressionsQueryOptions(postId: string, days: number) {
+	return queryOptions({
+		queryKey: ["post-daily-impressions", postId, days] as const,
+		queryFn: () => getPostDailyImpressionsFn({ data: { postId, days } }),
+	});
+}
+
+export function postViewerLocationsQueryOptions(postId: string, days: number) {
+	return queryOptions({
+		queryKey: ["post-viewer-locations", postId, days] as const,
+		queryFn: () => getPostViewerLocationsFn({ data: { postId, days } }),
+	});
+}
+
+export function postDwellDistributionQueryOptions(
+	postId: string,
+	days: number,
+) {
+	return queryOptions({
+		queryKey: ["post-dwell-distribution", postId, days] as const,
+		queryFn: () => getPostDwellDistributionFn({ data: { postId, days } }),
+	});
+}
+
+export function postFeedContextQueryOptions(postId: string, days: number) {
+	return queryOptions({
+		queryKey: ["post-feed-context", postId, days] as const,
+		queryFn: () => getPostFeedContextFn({ data: { postId, days } }),
+	});
+}
+
+export function postEngagementTrendQueryOptions(postId: string, days: number) {
+	return queryOptions({
+		queryKey: ["post-engagement-trend", postId, days] as const,
+		queryFn: () => getPostEngagementTrendFn({ data: { postId, days } }),
 	});
 }

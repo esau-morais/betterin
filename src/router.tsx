@@ -1,6 +1,7 @@
 import { QueryClient } from "@tanstack/react-query";
 import { createRouter as createTanStackRouter } from "@tanstack/react-router";
 import { setupRouterSsrQueryIntegration } from "@tanstack/react-router-ssr-query";
+import { ContentSkeleton } from "#/components/shared/ContentSkeleton";
 import type { Session } from "#/lib/auth-client";
 import { routeTree } from "./routeTree.gen";
 
@@ -41,9 +42,10 @@ export function getRouter() {
 		} satisfies RouterContext,
 		scrollRestoration: true,
 		defaultPreload: "intent",
-		defaultPreloadStaleTime: 0,
-		defaultPendingMs: 200,
-		defaultPendingMinMs: 300,
+		defaultPreloadStaleTime: 30_000,
+		defaultPendingComponent: ContentSkeleton,
+		defaultPendingMs: 100,
+		defaultPendingMinMs: 200,
 	});
 
 	setupRouterSsrQueryIntegration({ router, queryClient });

@@ -10,7 +10,7 @@ import {
 	SpinnerGapIcon,
 } from "@phosphor-icons/react";
 import { useForm } from "@tanstack/react-form";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import type React from "react";
 import { useCallback, useState } from "react";
@@ -21,26 +21,26 @@ import { Input } from "#/components/ui/input";
 import { FieldLabel } from "#/components/ui/label";
 import { signIn } from "#/lib/auth-client";
 import {
-	changePasswordFn,
-	hasPasswordFn,
-	listAccountProvidersFn,
-	setPasswordFn,
-} from "#/lib/server/account";
+	accountPasswordQueryOptions,
+	accountProvidersQueryOptions,
+} from "#/lib/queries";
+import { changePasswordFn, setPasswordFn } from "#/lib/server/account";
 import { initiateIdentityVerificationFn } from "#/lib/server/kws-actions";
 
 export const Route = createFileRoute("/_authed/settings/account")({
-	loader: async () => {
-		const [passwordStatus, providers] = await Promise.all([
-			hasPasswordFn(),
-			listAccountProvidersFn(),
-		]);
-		return { passwordStatus, providers };
-	},
+	loader: ({ context: { queryClient } }) =>
+		Promise.all([
+			queryClient.ensureQueryData(accountPasswordQueryOptions()),
+			queryClient.ensureQueryData(accountProvidersQueryOptions()),
+		]),
 	component: AccountPage,
 });
 
 function AccountPage() {
-	const { passwordStatus, providers } = Route.useLoaderData();
+	const { data: passwordStatus } = useSuspenseQuery(
+		accountPasswordQueryOptions(),
+	);
+	const { data: providers } = useSuspenseQuery(accountProvidersQueryOptions());
 	const { session } = Route.useRouteContext();
 
 	return (

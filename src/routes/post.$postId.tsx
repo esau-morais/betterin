@@ -221,6 +221,7 @@ function PostAuthorCard({ post }: { post: FeedPost }) {
 				to="/profile/$handle"
 				params={{ handle: post.author.handle ?? post.author.id }}
 				className="focus-ring rounded-full"
+				preload={false}
 			>
 				<UserAvatar
 					name={post.author.name}
@@ -232,6 +233,7 @@ function PostAuthorCard({ post }: { post: FeedPost }) {
 				to="/profile/$handle"
 				params={{ handle: post.author.handle ?? post.author.id }}
 				className="mt-3 text-sm font-medium hover:underline focus-ring rounded"
+				preload={false}
 			>
 				{post.author.name}
 			</Link>
@@ -375,6 +377,7 @@ function AuthenticatedPostView({
 					to="/profile/$handle"
 					params={{ handle: post.author.handle ?? post.author.id }}
 					className="shrink-0 rounded-full focus-ring"
+					preload={false}
 				>
 					<UserAvatar name={post.author.name} image={post.author.image} />
 				</Link>
@@ -385,6 +388,7 @@ function AuthenticatedPostView({
 							to="/profile/$handle"
 							params={{ handle: post.author.handle ?? post.author.id }}
 							className="rounded text-sm font-medium truncate hover:underline focus-ring"
+							preload={false}
 						>
 							{post.author.name}
 						</Link>
@@ -475,6 +479,7 @@ function UnauthenticatedPostView({ post }: { post: FeedPost }) {
 					to="/profile/$handle"
 					params={{ handle: post.author.handle ?? post.author.id }}
 					className="shrink-0 rounded-full focus-ring"
+					preload={false}
 				>
 					<UserAvatar name={post.author.name} image={post.author.image} />
 				</Link>
@@ -485,6 +490,7 @@ function UnauthenticatedPostView({ post }: { post: FeedPost }) {
 							to="/profile/$handle"
 							params={{ handle: post.author.handle ?? post.author.id }}
 							className="rounded text-sm font-medium truncate hover:underline focus-ring"
+							preload={false}
 						>
 							{post.author.name}
 						</Link>

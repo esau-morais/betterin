@@ -1,4 +1,5 @@
 import { ArrowLeftIcon, EyeIcon, UserPlusIcon } from "@phosphor-icons/react";
+import { useSuspenseQuery } from "@tanstack/react-query";
 import {
 	createFileRoute,
 	Link,
@@ -62,14 +63,16 @@ import { VolunteeringSection } from "#/components/profile/VolunteeringSection";
 import { UserAvatar } from "#/components/shared/UserAvatar";
 import { Alert, AlertAction, AlertDescription } from "#/components/ui/alert";
 import { Button } from "#/components/ui/button";
+import {
+	profilePostsQueryOptions,
+	profileSectionsQueryOptions,
+	publicProfileSectionsQueryOptions,
+} from "#/lib/queries";
 import type { ProfileData, PublicProfileData } from "#/lib/server/profile";
 import {
 	getProfileByHandleFn,
 	getProfileFn,
-	getProfilePostsFn,
-	getProfileSectionsFn,
 	getPublicProfileFn,
-	getPublicProfileSectionsFn,
 } from "#/lib/server/profile";
 
 type SearchParams = {
@@ -80,7 +83,7 @@ export const Route = createFileRoute("/profile/$handle")({
 	validateSearch: (search: Record<string, unknown>): SearchParams => ({
 		view: search.view === "public" ? "public" : undefined,
 	}),
-	loader: async ({ params }) => {
+	loader: async ({ params, context }) => {
 		let session: Awaited<
 			ReturnType<typeof import("#/lib/server/auth").getSessionFn>
 		> | null = null;
@@ -91,6 +94,8 @@ export const Route = createFileRoute("/profile/$handle")({
 			/* unauthenticated */
 		}
 
+		const queryClient = context.queryClient;
+
 		if (session) {
 			const [viewerProfile, profile] = await Promise.all([
 				getProfileFn(),
@@ -98,15 +103,13 @@ export const Route = createFileRoute("/profile/$handle")({
 			]);
 			if (!profile) throw notFound();
 
-			const [sections, postsResult] = await Promise.all([
-				getProfileSectionsFn({ data: { userId: profile.userId } }),
-				getProfilePostsFn({
-					data: {
-						userId: profile.userId,
-						viewerRelation: profile.connectionStatus,
-						limit: 10,
-					},
-				}),
+			await Promise.all([
+				queryClient.ensureQueryData(
+					profileSectionsQueryOptions(profile.userId),
+				),
+				queryClient.ensureQueryData(
+					profilePostsQueryOptions(profile.userId, profile.connectionStatus),
+				),
 			]);
 
 			return {
@@ -114,8 +117,6 @@ export const Route = createFileRoute("/profile/$handle")({
 				session,
 				viewerProfile,
 				profile,
-				sections,
-				posts: postsResult.posts,
 			};
 		}
 
@@ -124,9 +125,9 @@ export const Route = createFileRoute("/profile/$handle")({
 		});
 		if (!profile) throw notFound();
 
-		const sections = await getPublicProfileSectionsFn({
-			data: { userId: profile.userId },
-		});
+		await queryClient.ensureQueryData(
+			publicProfileSectionsQueryOptions(profile.userId),
+		);
 
 		return {
 			isAuthenticated: false as const,
@@ -137,8 +138,6 @@ export const Route = createFileRoute("/profile/$handle")({
 				connectionStatus: "none" as const,
 				isFollowing: false as const,
 			},
-			sections,
-			posts: [] as Awaited<ReturnType<typeof getProfilePostsFn>>["posts"],
 		};
 	},
 	head: ({ loaderData }) => {
@@ -329,11 +328,7 @@ function PublicProfilePage() {
 
 	return (
 		<PublicProfileLayout name={data.profile.user.name}>
-			<UnauthenticatedProfileView
-				profile={data.profile}
-				sections={data.sections}
-				posts={data.posts}
-			/>
+			<UnauthenticatedProfileView profile={data.profile} />
 		</PublicProfileLayout>
 	);
 }
@@ -348,7 +343,14 @@ function AuthenticatedProfileView({
 	>;
 	previewPublic?: boolean;
 }) {
-	const { profile, sections, posts, viewerProfile } = data;
+	const { profile, viewerProfile } = data;
+	const { data: sections } = useSuspenseQuery(
+		profileSectionsQueryOptions(profile.userId),
+	);
+	const { data: postsResult } = useSuspenseQuery(
+		profilePostsQueryOptions(profile.userId, profile.connectionStatus),
+	);
+	const posts = postsResult.posts;
 	const router = useRouter();
 
 	const isOwnProfile = viewerProfile && viewerProfile.handle === profile.handle;
@@ -406,12 +408,7 @@ function AuthenticatedProfileView({
 		return (
 			<AppShell rightPanel={rightPanel}>
 				<PreviewBanner handle={profile.handle} />
-				<UnauthenticatedProfileView
-					profile={profile}
-					sections={sections}
-					posts={posts}
-					isAuthenticated
-				/>
+				<UnauthenticatedProfileView profile={profile} isAuthenticated />
 			</AppShell>
 		);
 	}
@@ -685,19 +682,16 @@ function AuthenticatedProfileView({
 
 function UnauthenticatedProfileView({
 	profile,
-	sections,
-	posts,
 	isAuthenticated = false,
 }: {
 	profile:
 		| ProfileData
 		| (PublicProfileData & { connectionStatus: "none"; isFollowing: false });
-	sections:
-		| Awaited<ReturnType<typeof getProfileSectionsFn>>
-		| Awaited<ReturnType<typeof getPublicProfileSectionsFn>>;
-	posts: Awaited<ReturnType<typeof getProfilePostsFn>>["posts"];
 	isAuthenticated?: boolean;
 }) {
+	const { data: sections } = useSuspenseQuery(
+		publicProfileSectionsQueryOptions(profile.userId),
+	);
 	return (
 		<Suspense fallback={<ProfileSkeleton />}>
 			<div className="space-y-4">
@@ -767,8 +761,6 @@ function UnauthenticatedProfileView({
 						topSkills={sections.skills.slice(0, 5)}
 					/>
 				)}
-
-				{posts.length > 0 && <ActivitySection posts={posts} />}
 
 				{sections.experiences.length > 0 && (
 					<ExperienceSection

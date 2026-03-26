@@ -1,10 +1,10 @@
 import { CaretDownIcon, XIcon } from "@phosphor-icons/react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, getRouteApi, Link } from "@tanstack/react-router";
 import { Suspense, useState } from "react";
 import { toast } from "sonner";
 import { FeedList } from "#/components/feed/FeedList";
-import { FeedPageSkeleton, FeedSkeleton } from "#/components/feed/FeedSkeleton";
+import { FeedSkeleton } from "#/components/feed/FeedSkeleton";
 import { ParentalConsentBanner } from "#/components/feed/ParentalConsentBanner";
 import { PostComposer } from "#/components/feed/PostComposer";
 import {
@@ -13,10 +13,9 @@ import {
 	PopoverTrigger,
 } from "#/components/ui/popover";
 import {
-	feedInfiniteQueryOptions,
+	accountPasswordQueryOptions,
 	preferencesQueryOptions,
 } from "#/lib/queries";
-import { hasPasswordFn } from "#/lib/server/account";
 import { dismissBannerFn, updateFeedModeFn } from "#/lib/server/preferences";
 import { cn } from "#/lib/utils";
 import type { FeedMode } from "#/lib/validation";
@@ -29,34 +28,28 @@ const FEED_MODES = [
 ];
 
 export const Route = createFileRoute("/_authed/feed")({
-	loader: async ({ context: { queryClient } }) => {
-		const [passwordStatus, preferences] = await Promise.all([
-			hasPasswordFn(),
+	loader: ({ context: { queryClient } }) =>
+		Promise.all([
+			queryClient.ensureQueryData(accountPasswordQueryOptions()),
 			queryClient.ensureQueryData(preferencesQueryOptions()),
-		]);
-		const dismissed = preferences?.dismissedBanners ?? [];
-		const feedMode = (preferences?.feedMode ?? "ranked") as FeedMode;
-		await queryClient.ensureInfiniteQueryData(
-			feedInfiniteQueryOptions(feedMode),
-		);
-		return {
-			showPasswordBanner:
-				!passwordStatus.hasPassword && !dismissed.includes(PASSWORD_BANNER_ID),
-			feedMode,
-		};
-	},
-	pendingComponent: FeedPageSkeleton,
+		]),
 	component: FeedPage,
 });
 
 const authedRoute = getRouteApi("/_authed");
 
 function FeedPage() {
-	const { showPasswordBanner, feedMode: initialFeedMode } =
-		Route.useLoaderData();
 	const { restrictions } = authedRoute.useRouteContext();
-	const [feedMode, setFeedMode] = useState(initialFeedMode);
 	const queryClient = useQueryClient();
+	const { data: passwordStatus } = useQuery(accountPasswordQueryOptions());
+	const { data: preferences } = useQuery(preferencesQueryOptions());
+	const dismissed = preferences?.dismissedBanners ?? [];
+	const showPasswordBanner =
+		passwordStatus &&
+		!passwordStatus.hasPassword &&
+		!dismissed.includes(PASSWORD_BANNER_ID);
+	const initialFeedMode = (preferences?.feedMode ?? "ranked") as FeedMode;
+	const [feedMode, setFeedMode] = useState(initialFeedMode);
 
 	const showConsentBanner =
 		restrictions.requiresParentalLink && !restrictions.parentalConsentVerified;

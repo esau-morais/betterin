@@ -35,14 +35,16 @@ import {
 } from "#/components/ui/chart";
 import { Skeleton } from "#/components/ui/skeleton";
 import {
+	postAnalyticsQueryOptions,
+	postDailyImpressionsQueryOptions,
+	postDwellDistributionQueryOptions,
+	postEngagementTrendQueryOptions,
+	postFeedContextQueryOptions,
+	postViewerLocationsQueryOptions,
+} from "#/lib/queries";
+import {
 	exportPostAnalyticsFn,
-	getPostAnalyticsFn,
-	getPostDailyImpressionsFn,
-	getPostDwellDistributionFn,
-	getPostEngagementTrendFn,
-	getPostFeedContextFn,
 	getPostHourlyActivityFn,
-	getPostViewerLocationsFn,
 } from "#/lib/server/post-analytics";
 import { cn } from "#/lib/utils";
 
@@ -61,39 +63,31 @@ const engagementChartConfig = {
 } satisfies ChartConfig;
 
 export const Route = createFileRoute("/_authed/post/$postId/analytics")({
-	loader: async ({ params }) => {
+	loader: ({ params, context: { queryClient } }) => {
 		const postId = params.postId;
 		const days = 7;
-		try {
-			const [
-				analytics,
-				dailyImpressions,
-				viewerLocations,
-				dwellDistribution,
-				feedContext,
-				engagementTrend,
-			] = await Promise.all([
-				getPostAnalyticsFn({ data: { postId, days } }),
-				getPostDailyImpressionsFn({ data: { postId, days } }),
-				getPostViewerLocationsFn({ data: { postId, days } }),
-				getPostDwellDistributionFn({ data: { postId, days } }),
-				getPostFeedContextFn({ data: { postId, days } }),
-				getPostEngagementTrendFn({ data: { postId, days } }),
-			]);
-			return {
-				analytics,
-				dailyImpressions: dailyImpressions.dailyImpressions,
-				viewerLocations,
-				dwellDistribution,
-				feedContext,
-				engagementTrend,
-			};
-		} catch {
-			throw redirect({ to: "/post/$postId", params });
-		}
+		return Promise.all([
+			queryClient.ensureQueryData(postAnalyticsQueryOptions(postId, days)),
+			queryClient.ensureQueryData(
+				postDailyImpressionsQueryOptions(postId, days),
+			),
+			queryClient.ensureQueryData(
+				postViewerLocationsQueryOptions(postId, days),
+			),
+			queryClient.ensureQueryData(
+				postDwellDistributionQueryOptions(postId, days),
+			),
+			queryClient.ensureQueryData(postFeedContextQueryOptions(postId, days)),
+			queryClient.ensureQueryData(
+				postEngagementTrendQueryOptions(postId, days),
+			),
+		]);
 	},
 	component: PostAnalyticsPage,
 	pendingComponent: AnalyticsSkeleton,
+	onError: () => {
+		throw redirect({ to: "/feed" });
+	},
 });
 
 function AnalyticsSkeleton() {
@@ -144,14 +138,12 @@ function AnalyticsSkeleton() {
 }
 
 function PostAnalyticsPage() {
-	const data = Route.useLoaderData();
+	const { postId } = Route.useParams();
 	const router = useRouter();
 	const [dateFilter, setDateFilter] = useState<DateFilter>({
 		type: "preset",
 		days: 7,
 	});
-
-	const postId = data.analytics.post.id;
 
 	const days =
 		dateFilter.type === "preset"
@@ -166,58 +158,46 @@ function PostAnalyticsPage() {
 	);
 
 	const { data: analytics } = useQuery({
-		queryKey: ["post-analytics", postId, days],
-		queryFn: () => getPostAnalyticsFn({ data: { postId, days } }),
-		initialData: days === 7 ? data.analytics : undefined,
+		...postAnalyticsQueryOptions(postId, days),
 		placeholderData: keepPreviousData,
 	});
 
 	const { data: impressionsData } = useQuery({
-		queryKey: ["post-daily-impressions", postId, days],
-		queryFn: () => getPostDailyImpressionsFn({ data: { postId, days } }),
-		initialData:
-			days === 7 ? { dailyImpressions: data.dailyImpressions } : undefined,
+		...postDailyImpressionsQueryOptions(postId, days),
 		placeholderData: keepPreviousData,
 	});
 
 	const { data: hourlyActivity } = useQuery({
-		queryKey: ["post-hourly-activity", postId, days],
+		queryKey: ["post-hourly-activity", postId, days, timezone],
 		queryFn: () =>
 			getPostHourlyActivityFn({ data: { postId, days, timezone } }),
 		placeholderData: keepPreviousData,
 	});
 
 	const { data: viewerLocations } = useQuery({
-		queryKey: ["post-viewer-locations", postId, days],
-		queryFn: () => getPostViewerLocationsFn({ data: { postId, days } }),
-		initialData: days === 7 ? data.viewerLocations : undefined,
+		...postViewerLocationsQueryOptions(postId, days),
 		placeholderData: keepPreviousData,
 	});
 
 	const { data: dwellDistribution } = useQuery({
-		queryKey: ["post-dwell-distribution", postId, days],
-		queryFn: () => getPostDwellDistributionFn({ data: { postId, days } }),
-		initialData: days === 7 ? data.dwellDistribution : undefined,
+		...postDwellDistributionQueryOptions(postId, days),
 		placeholderData: keepPreviousData,
 	});
 
 	const { data: feedContext } = useQuery({
-		queryKey: ["post-feed-context", postId, days],
-		queryFn: () => getPostFeedContextFn({ data: { postId, days } }),
-		initialData: days === 7 ? data.feedContext : undefined,
+		...postFeedContextQueryOptions(postId, days),
 		placeholderData: keepPreviousData,
 	});
 
 	const { data: engagementTrend } = useQuery({
-		queryKey: ["post-engagement-trend", postId, days],
-		queryFn: () => getPostEngagementTrendFn({ data: { postId, days } }),
-		initialData: days === 7 ? data.engagementTrend : undefined,
+		...postEngagementTrendQueryOptions(postId, days),
 		placeholderData: keepPreviousData,
 	});
 
-	const dailyImpressions =
-		impressionsData?.dailyImpressions ?? data.dailyImpressions;
-	const analyticsData = analytics ?? data.analytics;
+	const dailyImpressions = impressionsData?.dailyImpressions ?? [];
+
+	if (!analytics) return <AnalyticsSkeleton />;
+	const analyticsData = analytics;
 
 	const handleExport = useCallback(async () => {
 		try {
