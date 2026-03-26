@@ -23,7 +23,7 @@ export const sendOtpFn = createServerFn({ method: "POST" })
 			body: { email: data.email.trim(), type: data.type },
 		});
 
-		await redis.set(key, "1", "EX", OTP_COOLDOWN_SECONDS);
+		await redis.set(key, "1", { ex: OTP_COOLDOWN_SECONDS });
 
 		return { cooldownUntil: Date.now() + OTP_COOLDOWN_SECONDS * 1000 };
 	});

@@ -1,5 +1,5 @@
 import { Schema } from "effect";
-import { createSubscriber, redis } from "#/lib/redis";
+import { redis } from "#/lib/redis";
 
 const PubSubEventSchema = Schema.Struct({
 	type: Schema.Literal("new_message", "message_read", "notification", "typing"),
@@ -23,27 +23,22 @@ export function subscribe(
 	channel: string,
 	onMessage: (event: PubSubEvent) => void,
 ): { unsubscribe: () => Promise<void> } {
-	const sub = createSubscriber();
+	const sub = redis.subscribe<string>(channel);
 
-	sub.subscribe(channel).catch((err) => {
-		console.error(`[pubsub] subscribe error for ${channel}:`, err);
-	});
-
-	sub.on("message", (_ch: string, raw: string) => {
+	sub.on("message", ({ message }) => {
 		try {
 			const event = Schema.decodeUnknownSync(PubSubEventSchema)(
-				JSON.parse(raw),
+				JSON.parse(message),
 			);
 			onMessage(event);
 		} catch {
-			console.error("[pubsub] failed to parse message:", raw);
+			console.error("[pubsub] failed to parse message:", message);
 		}
 	});
 
 	return {
 		unsubscribe: async () => {
-			await sub.unsubscribe(channel);
-			sub.disconnect();
+			await sub.unsubscribe();
 		},
 	};
 }
