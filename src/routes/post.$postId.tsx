@@ -106,7 +106,14 @@ export const Route = createFileRoute("/post/$postId")({
 	},
 	component: SinglePostPage,
 	notFoundComponent: PostNotFound,
-	pendingComponent: PostSkeleton,
+	pendingComponent: () => (
+		<AppShell>
+			<div className="space-y-4">
+				<BackToFeed />
+				<PostSkeleton />
+			</div>
+		</AppShell>
+	),
 });
 
 function PostNotFound() {
