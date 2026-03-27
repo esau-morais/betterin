@@ -15,6 +15,7 @@ import { JobFilters } from "#/components/jobs/JobFilters";
 import { AppShell } from "#/components/layout/AppShell";
 import { SearchFilters } from "#/components/search/SearchFilters";
 import { SearchTips } from "#/components/search/SearchTips";
+import { ContentSkeleton } from "#/components/shared/ContentSkeleton";
 import { computeRestrictions } from "#/lib/restrictions";
 import { getSessionFn } from "#/lib/server/auth";
 import { markConversationReadFn } from "#/lib/server/messages";
@@ -61,6 +62,11 @@ export const Route = createFileRoute("/_authed")({
 			});
 		}
 	},
+	pendingComponent: () => (
+		<AppShell>
+			<ContentSkeleton />
+		</AppShell>
+	),
 	component: AuthedLayout,
 });
 

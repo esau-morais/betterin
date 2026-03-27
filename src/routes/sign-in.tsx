@@ -6,7 +6,12 @@ import {
 } from "@phosphor-icons/react";
 import { useForm } from "@tanstack/react-form";
 import { useMutation } from "@tanstack/react-query";
-import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
+import {
+	createFileRoute,
+	Link,
+	redirect,
+	useRouter,
+} from "@tanstack/react-router";
 import { REGEXP_ONLY_DIGITS } from "input-otp";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { z } from "zod";
@@ -40,9 +45,19 @@ const searchSchema = z.object({
 
 export const Route = createFileRoute("/sign-in")({
 	validateSearch: searchSchema,
-	loaderDeps: ({ search }) => ({ step: search.step, email: search.email }),
-	loader: async ({ deps: { step, email } }) => {
-		if (step === "otp" && email) {
+	beforeLoad: ({ search }) => {
+		if (
+			(search.step === "otp" || search.step === "password") &&
+			!search.email
+		) {
+			throw redirect({ to: "/sign-in" });
+		}
+	},
+	loaderDeps: ({ search }) => ({
+		email: search.step === "otp" ? search.email : undefined,
+	}),
+	loader: async ({ deps: { email } }) => {
+		if (email) {
 			return getOtpCooldownFn({ data: { email } });
 		}
 		return { cooldownUntil: 0 };
