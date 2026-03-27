@@ -28,11 +28,10 @@ const FEED_MODES = [
 ];
 
 export const Route = createFileRoute("/_authed/feed")({
-	loader: ({ context: { queryClient } }) =>
-		Promise.all([
-			queryClient.ensureQueryData(accountPasswordQueryOptions()),
-			queryClient.ensureQueryData(preferencesQueryOptions()),
-		]),
+	loader: ({ context: { queryClient } }) => {
+		queryClient.ensureQueryData(accountPasswordQueryOptions());
+		queryClient.ensureQueryData(preferencesQueryOptions());
+	},
 	component: FeedPage,
 });
 

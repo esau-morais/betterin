@@ -28,11 +28,10 @@ import { changePasswordFn, setPasswordFn } from "#/lib/server/account";
 import { initiateIdentityVerificationFn } from "#/lib/server/kws-actions";
 
 export const Route = createFileRoute("/_authed/settings/account")({
-	loader: ({ context: { queryClient } }) =>
-		Promise.all([
-			queryClient.ensureQueryData(accountPasswordQueryOptions()),
-			queryClient.ensureQueryData(accountProvidersQueryOptions()),
-		]),
+	loader: ({ context: { queryClient } }) => {
+		queryClient.ensureQueryData(accountPasswordQueryOptions());
+		queryClient.ensureQueryData(accountProvidersQueryOptions());
+	},
 	component: AccountPage,
 });
 

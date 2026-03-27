@@ -58,12 +58,10 @@ export const Route = createFileRoute("/company/$slug")({
 		const company = await queryClient.ensureQueryData(
 			companyQueryOptions(params.slug),
 		);
-		const [members, jobsData, companyPosts] = await Promise.all([
-			queryClient.ensureQueryData(companyMembersQueryOptions(company.id)),
-			queryClient.ensureQueryData(jobsQueryOptions({ companyId: company.id })),
-			queryClient.ensureQueryData(companyPostsQueryOptions(company.id)),
-		]);
-		return { company, members, jobs: jobsData.results, companyPosts };
+		queryClient.ensureQueryData(companyMembersQueryOptions(company.id));
+		queryClient.ensureQueryData(jobsQueryOptions({ companyId: company.id }));
+		queryClient.ensureQueryData(companyPostsQueryOptions(company.id));
+		return { company };
 	},
 	component: CompanyPage,
 	pendingComponent: () => (
@@ -217,7 +215,17 @@ function CompanyPageContent() {
 	const { tab } = Route.useSearch();
 	const navigate = useNavigate({ from: Route.fullPath });
 	const router = useRouter();
-	const { company, members, jobs, companyPosts } = Route.useLoaderData();
+	const { company } = Route.useLoaderData();
+	const { data: members } = useSuspenseQuery(
+		companyMembersQueryOptions(company.id),
+	);
+	const { data: jobsData } = useSuspenseQuery(
+		jobsQueryOptions({ companyId: company.id }),
+	);
+	const { data: companyPosts } = useSuspenseQuery(
+		companyPostsQueryOptions(company.id),
+	);
+	const jobs = jobsData.results;
 
 	const [editOpen, setEditOpen] = useState(false);
 
@@ -342,12 +350,18 @@ function CompanyPageContent() {
 }
 
 function CompanyPage() {
-	const { company, jobs } = Route.useLoaderData();
+	const { company } = Route.useLoaderData();
+	const { data: jobsData } = useSuspenseQuery(
+		jobsQueryOptions({ companyId: company.id }),
+	);
 
 	return (
 		<AppShell
 			rightPanel={
-				<CompanyRightPanel company={company} jobCount={jobs.length} />
+				<CompanyRightPanel
+					company={company}
+					jobCount={jobsData.results.length}
+				/>
 			}
 		>
 			<CompanyPageContent />

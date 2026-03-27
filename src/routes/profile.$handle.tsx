@@ -97,20 +97,16 @@ export const Route = createFileRoute("/profile/$handle")({
 		const queryClient = context.queryClient;
 
 		if (session) {
-			const [viewerProfile, profile] = await Promise.all([
-				getProfileFn(),
-				getProfileByHandleFn({ data: { handle: params.handle } }),
-			]);
+			const viewerProfile = await getProfileFn();
+			const profile = await getProfileByHandleFn({
+				data: { handle: params.handle },
+			});
 			if (!profile) throw notFound();
 
-			await Promise.all([
-				queryClient.ensureQueryData(
-					profileSectionsQueryOptions(profile.userId),
-				),
-				queryClient.ensureQueryData(
-					profilePostsQueryOptions(profile.userId, profile.connectionStatus),
-				),
-			]);
+			queryClient.ensureQueryData(profileSectionsQueryOptions(profile.userId));
+			queryClient.ensureQueryData(
+				profilePostsQueryOptions(profile.userId, profile.connectionStatus),
+			);
 
 			return {
 				isAuthenticated: true as const,

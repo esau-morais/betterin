@@ -21,11 +21,9 @@ import {
 } from "#/lib/server/messages";
 
 export const Route = createFileRoute("/_authed/messages/$id")({
-	loader: async ({ params, context: { queryClient } }) => {
-		await Promise.all([
-			queryClient.ensureQueryData(conversationInfoQueryOptions(params.id)),
-			queryClient.ensureInfiniteQueryData(messagesQueryOptions(params.id)),
-		]);
+	loader: ({ params, context: { queryClient } }) => {
+		queryClient.ensureQueryData(conversationInfoQueryOptions(params.id));
+		queryClient.ensureInfiniteQueryData(messagesQueryOptions(params.id));
 	},
 	component: MessageThreadView,
 });

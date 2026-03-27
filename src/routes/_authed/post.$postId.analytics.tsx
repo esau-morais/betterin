@@ -66,22 +66,14 @@ export const Route = createFileRoute("/_authed/post/$postId/analytics")({
 	loader: ({ params, context: { queryClient } }) => {
 		const postId = params.postId;
 		const days = 7;
-		return Promise.all([
-			queryClient.ensureQueryData(postAnalyticsQueryOptions(postId, days)),
-			queryClient.ensureQueryData(
-				postDailyImpressionsQueryOptions(postId, days),
-			),
-			queryClient.ensureQueryData(
-				postViewerLocationsQueryOptions(postId, days),
-			),
-			queryClient.ensureQueryData(
-				postDwellDistributionQueryOptions(postId, days),
-			),
-			queryClient.ensureQueryData(postFeedContextQueryOptions(postId, days)),
-			queryClient.ensureQueryData(
-				postEngagementTrendQueryOptions(postId, days),
-			),
-		]);
+		queryClient.ensureQueryData(postAnalyticsQueryOptions(postId, days));
+		queryClient.ensureQueryData(postDailyImpressionsQueryOptions(postId, days));
+		queryClient.ensureQueryData(postViewerLocationsQueryOptions(postId, days));
+		queryClient.ensureQueryData(
+			postDwellDistributionQueryOptions(postId, days),
+		);
+		queryClient.ensureQueryData(postFeedContextQueryOptions(postId, days));
+		queryClient.ensureQueryData(postEngagementTrendQueryOptions(postId, days));
 	},
 	component: PostAnalyticsPage,
 	pendingComponent: AnalyticsSkeleton,
