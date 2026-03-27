@@ -41,7 +41,7 @@ export const createEventPostFn = createServerFn({ method: "POST" })
 				if (data.contentFormat === "tiptap" && data.content.trim()) {
 					const [{ generateHTML }, { StarterKit }] = yield* Effect.promise(() =>
 						Promise.all([
-							import("@tiptap/html"),
+							import("@tiptap/html/server"),
 							import("@tiptap/starter-kit"),
 						]),
 					);

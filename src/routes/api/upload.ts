@@ -65,9 +65,9 @@ export const Route = createFileRoute("/api/upload")({
 
 				const ext = getExtension(contentType);
 				const key = `media/${session.user.id}/${crypto.randomUUID()}.${ext}`;
-				const buffer = Buffer.from(await file.arrayBuffer());
+				const body = await file.arrayBuffer();
 
-				const url = await uploadFile(key, buffer, contentType);
+				const url = await uploadFile(key, body, contentType);
 
 				return Response.json({
 					url,

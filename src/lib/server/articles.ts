@@ -20,7 +20,7 @@ function slugify(text: string): string {
 async function generateArticleHtml(bodyJsonStr: string): Promise<string> {
 	const [{ generateHTML }, { StarterKit }, { Image }, { Link }] =
 		await Promise.all([
-			import("@tiptap/html"),
+			import("@tiptap/html/server"),
 			import("@tiptap/starter-kit"),
 			import("@tiptap/extension-image"),
 			import("@tiptap/extension-link"),

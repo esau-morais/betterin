@@ -600,7 +600,7 @@ export const createPostFn = createServerFn({ method: "POST" })
 					const [{ generateHTML }, { default: StarterKit }] =
 						yield* Effect.promise(() =>
 							Promise.all([
-								import("@tiptap/html"),
+								import("@tiptap/html/server"),
 								import("@tiptap/starter-kit"),
 							]),
 						);
