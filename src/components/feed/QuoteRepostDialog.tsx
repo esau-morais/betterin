@@ -2,7 +2,7 @@ import { GlobeIcon, UsersThreeIcon } from "@phosphor-icons/react";
 import { useForm } from "@tanstack/react-form";
 import { useHotkey } from "@tanstack/react-hotkeys";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { getRouteApi } from "@tanstack/react-router";
+import { useSession } from "#/lib/auth-client";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { z } from "zod";
@@ -23,8 +23,6 @@ const VISIBILITY_OPTIONS = [
 	{ value: "connections" as const, icon: UsersThreeIcon, label: "Connections" },
 ];
 
-const authedRoute = getRouteApi("/_authed");
-
 export function QuoteRepostDialog({
 	post,
 	open,
@@ -34,8 +32,8 @@ export function QuoteRepostDialog({
 	open: boolean;
 	onOpenChange: (open: boolean) => void;
 }) {
-	const { session } = authedRoute.useRouteContext();
-	const user = session.user;
+	const { data: session } = useSession();
+	const user = session?.user;
 	const queryClient = useQueryClient();
 	const textareaRef = useRef<HTMLTextAreaElement>(null);
 	const [visibility, setVisibility] = useState<"public" | "connections">(
@@ -81,6 +79,8 @@ export function QuoteRepostDialog({
 		el.style.height = "auto";
 		el.style.height = `${Math.min(el.scrollHeight, 200)}px`;
 	}
+
+	if (!user) return null;
 
 	return (
 		<Dialog open={open} onOpenChange={onOpenChange}>
